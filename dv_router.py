@@ -13,7 +13,7 @@ class DVEntry:
 
     def is_expired(self,current_time, timeout):
         if self.creation_time is not None:
-            return ((self.current_time - self.creation_time) >= timeout)
+            return ((current_time - self.creation_time) >= timeout)
         return False
 
 
@@ -39,10 +39,7 @@ class DistanceVector:
         return destination in self.entries_by_dest
 
     def get_distance(self,destination):
-        """Returns None if destination not in this DistanceVector"""
-        if destination in self.entries_by_dest:
-            return self.entries_by_dest[destination].distance
-        return None
+        return self.entries_by_dest[destination].distance
 
     def remove_expired_entries(self, current_time, timeout):
         to_remove = []
@@ -84,7 +81,7 @@ class RoutingTable:
 class DVRouter(basics.DVRouterBase):
     # NO_LOG = True # Set to True on an instance to disable its logging
     # POISON_MODE = True # Can override POISON_MODE here
-    DEFAULT_TIMER_INTERVAL = 5 # Can override this yourself for testing
+    # DEFAULT_TIMER_INTERVAL = 5 # Can override this yourself for testing
 
     """Plan for dealing with poisoning stuff:
         Split horizon: Upon receiving a routing packet, keep track of where you got it from
@@ -107,6 +104,7 @@ class DVRouter(basics.DVRouterBase):
         self.distance_vector_table = {}
         self.routing_table = RoutingTable()
         self.ports_to_latencies = {}
+        self.connected_hosts = set([])
         self.start_timer()  # Starts calling handle_timer() at correct rate
 
     def handle_link_up(self, port, latency):
@@ -131,8 +129,7 @@ class DVRouter(basics.DVRouterBase):
             if (dest == self) or (self.routing_table.get_port(dest) != port):
                 self.send(route_packet,port=port)
             elif self.POISON_MODE: # if one host disconnects and reconnects at same port
-                poison_packet = basics.RoutePacket(destination, INFINITY)
-                self.send(poison_packet, port_to_poison)
+                self.poison_reverse(destination, port)
 
     def handle_link_down(self, port):
         """
@@ -149,6 +146,7 @@ class DVRouter(basics.DVRouterBase):
                 to_recompute.append(dest) # Can't delete from routing table yet
         for dest in to_recompute: # Make sure these don't get used in route recomputation
             self.routing_table.remove(dest)
+            self.own_distance_vector.remove(dest)
         for dest in to_recompute:
             route_changed, no_route, port_to_poison = self.update_route_to_dest(dest)
             if (no_route and self.POISON_MODE):
@@ -184,7 +182,7 @@ class DVRouter(basics.DVRouterBase):
         destination = packet.destination
         distance = packet.latency
         self.update_distance_vector_table(neighbor,destination,distance)
-        if (distance == 0): # Neighbor declaring itself
+        if (distance == 0): # Neighbor declaring itself TODO
             self.routing_table.update(neighbor, port) # A bit hacky.
         route_changed, no_route, port_to_poison = self.update_route_to_dest(destination)
         if (route_changed):
@@ -204,7 +202,10 @@ class DVRouter(basics.DVRouterBase):
         dv_to_update.update(destination,distance,current_time)
 
     def update_route_to_dest(self, destination):
-        """Computes the new optimal route to destination.
+        """
+        Computes the new optimal route to destination.
+
+        Updates own_distance_vector and routing_table.
         Returns boolean indicating whether or not route was changed and the
         port that was used (for split horizon and poisoned reverse)."""
         route_changed = False
@@ -231,10 +232,11 @@ class DVRouter(basics.DVRouterBase):
         best_port = None
         for entity in self.distance_vector_table:
             distance_vector = self.distance_vector_table[entity]
-            entity_distance = distance_vector.get_distance(destination)
-            if (entity_distance is not None) and (self.routing_table.contains(entity)):
+            if (distance_vector.contains(destination) and self.routing_table.contains(entity)):
+                entity_distance = distance_vector.get_distance(destination)
                 candidate_port = self.routing_table.get_port(entity)
-                total_distance = self.add_distances(self.ports_to_latencies[candidate_port],
+                distance_to_entity = self.ports_to_latencies[candidate_port]
+                total_distance = self.add_distances(distance_to_entity,
                                                     entity_distance)
                 update_best = (best_dist is None) or (total_distance < best_dist)
                 update_best = update_best and (total_distance < INFINITY)
@@ -247,7 +249,7 @@ class DVRouter(basics.DVRouterBase):
         """
         Adds 2 latencies, but caps the sum at INFINITY.
         """
-        return min(distance1+distance2, INFINITY)
+        return min(distance1+distance2, INFINITY) # TODO
 
     def send_route_update(self, destination, port_to_poison):
         """Sends routing packets to all ports for destination, except for
@@ -262,7 +264,7 @@ class DVRouter(basics.DVRouterBase):
 
     def poison_route(self, destination):
         poison_packet = basics.RoutePacket(destination, INFINITY)
-        self.send(poison_packet, flood=False)
+        self.send(poison_packet, flood=True)
 
     def poison_reverse(self, destination, port_to_poison):
         poison_packet = basics.RoutePacket(destination, INFINITY)
@@ -272,6 +274,7 @@ class DVRouter(basics.DVRouterBase):
     def handle_host_discovery_packet(self, packet, port):
         # Host will not send you any routing packets, so must update distance now
         host = packet.src
+        self.connected_hosts.add(host)
         # Host has a distance of 0 to itself and can't route anywhere else.
         self.update_distance_vector_table(host,host,0)
         self.routing_table.update(host, port) # Know we can go through this port
@@ -297,8 +300,13 @@ class DVRouter(basics.DVRouterBase):
         # Update distance vector table to remove expired entries
         current_time = api.current_time()
         self.own_distance_vector.remove_expired_entries(current_time, self.ROUTE_TIMEOUT)
+        # Expire the routes of anything in the distance vector table that did not come from a host
+        for entity in self.distance_vector_table:
+            if entity not in self.connected_hosts:
+                dv = self.distance_vector_table[entity]
+                dv.remove_expired_entries(current_time, self.ROUTE_TIMEOUT)
         # Recompute distance vector. Send everything in distance vector to neighbors.
-        for dest in self.own_distance_vector.get_destination_list():
+        for dest in self.routing_table.get_destination_list():
             route_changed, no_route, port_to_poison = self.update_route_to_dest(dest)
             self.send_route_update(dest, port_to_poison)
 
