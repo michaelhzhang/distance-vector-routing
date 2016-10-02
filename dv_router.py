@@ -61,12 +61,13 @@ class DVRouter(basics.DVRouterBase):
         The port number used by the link is passed in.
 
         """
+        self.remove_hosts_on_port(port) # Must be before next line
         deleted_routes = self.remove_paths_using_port(port)
         del self.port_to_latency[port]
-        self.remove_hosts_on_port(port)
 
     def remove_paths_using_port(self, port):
         # Returns list of destinations that were removed
+        current_time = api.current_time()
         removed_destinations = []
         for destination in self.routing_table:
             out_port = self.get_routing_port(destination)
@@ -74,6 +75,8 @@ class DVRouter(basics.DVRouterBase):
                 removed_destinations.append(destination)
         for destination in removed_destinations:
             self.remove_route(destination)
+            # ALways maintain path to connected host
+            self.add_default_host_route(destination, current_time)
 
     def remove_hosts_on_port(self, port):
         hosts_to_remove = []

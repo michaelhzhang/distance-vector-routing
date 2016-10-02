@@ -40,6 +40,8 @@ def main():
     t.test('dv_router', 'tests.test_simple_2_routers', extra_args=['--poison-mode'])
     t.test('dv_router','tests.test_failure_3_routers')
     t.test('dv_router', 'tests.test_failure_3_routers', extra_args=['--poison-mode'])
+    t.test('dv_router','tests.test_shorter_host_connection')
+    t.test('dv_router', 'tests.test_shorter_host_connection', extra_args=['--poison-mode'])
 
     # Add your own tests here.
 
