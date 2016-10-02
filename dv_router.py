@@ -111,9 +111,7 @@ class DVRouter(basics.DVRouterBase):
         creation_time = api.current_time()
         port_latency = self.port_to_latency[port]
         total_distance = self.add_latencies(latency, port_latency)
-        if self.POISON_MODE and (latency == INFINITY):
-            self.remove_route(destination)
-        elif (destination not in self.routing_table):
+        if (destination not in self.routing_table):
             if total_distance != INFINITY:
                 self.routing_table[destination] = (port, total_distance, creation_time)
         else: # Destination in routing table

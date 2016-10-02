@@ -21,15 +21,25 @@ def main():
 
     t.test('learning_switch', 'tests.test_learning')
     t.test('dv_router', 'tests.test_simple')
+    t.test('dv_router', 'tests.test_simple', extra_args=['--poison-mode'])
     t.test('dv_router', 'tests.test_failure')
+    t.test('dv_router', 'tests.test_failure', extra_args=['--poison-mode'])
     t.test('dv_router', 'tests.test_initialize_neighbor')
+    t.test('dv_router', 'tests.test_initialize_neighbor', extra_args=['--poison-mode'])
     t.test('dv_router', 'tests.test_no_hairpin')
+    t.test('dv_router', 'tests.test_no_hairpin', extra_args=['--poison-mode'])
     t.test('dv_router', 'tests.test_link_weights')
+    t.test('dv_router', 'tests.test_link_weights', extra_args=['--poison-mode'])
     t.test('dv_router', 'tests.test_expire_routes')
+    t.test('dv_router', 'tests.test_expire_routes', extra_args=['--poison-mode'])
     t.test(
         'dv_router',
         'tests.test_route_poisoning',
         extra_args=['--poison-mode'])
+    t.test('dv_router','tests.test_simple_2_routers')
+    t.test('dv_router', 'tests.test_simple_2_routers', extra_args=['--poison-mode'])
+    t.test('dv_router','tests.test_failure_3_routers')
+    t.test('dv_router', 'tests.test_failure_3_routers', extra_args=['--poison-mode'])
 
     # Add your own tests here.
 
