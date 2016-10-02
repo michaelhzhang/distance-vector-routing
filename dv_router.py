@@ -151,7 +151,6 @@ class DVRouter(basics.DVRouterBase):
 
     def handle_data_packet(self, packet, port):
         destination = packet.dst
-        # TODO: Should we keep track of the source?
         if destination in self.routing_table:
             out_port = self.get_routing_port(destination)
             if (out_port != port): # No hairpin
