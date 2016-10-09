@@ -140,10 +140,13 @@ class DVRouter(basics.DVRouterBase):
 
     def add_default_host_route(self, destination,creation_time):
         # Always keep entry for host
-        if (destination in self.host_to_port) and (destination not in self.routing_table):
+        if (destination in self.host_to_port):
             host_port = self.host_to_port[destination]
             new_latency = self.port_to_latency[host_port]
-            self.routing_table[destination] = (host_port, new_latency, creation_time)
+            if (destination not in self.routing_table):
+                self.routing_table[destination] = (host_port, new_latency, creation_time)
+            elif (new_latency < self.get_routing_distance(destination)):
+                self.routing_table[destination] = (host_port, new_latency, creation_time)
 
     def handle_host_discovery_packet(self, packet, port):
         host = packet.src
