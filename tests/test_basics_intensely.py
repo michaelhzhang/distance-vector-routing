@@ -153,7 +153,7 @@ def launch():
         c2.unlinkTo(r3)
 
         api.userlog.debug('Waiting for routes to time out')
-        yield 20
+        yield 22
 
         api.userlog.debug('Sending ping from h1 to h2 - it should be sent through r1')
         h1.ping(h2)
